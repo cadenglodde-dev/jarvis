@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J.A.R.V.I.S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #03070d;
+    --panel: rgba(8, 20, 34, 0.72);
+    --line: rgba(77, 200, 255, 0.22);
+    --line-bright: rgba(77, 200, 255, 0.55);
+    --cyan: #4dd8ff;
+    --cyan-dim: #2a7ba8;
+    --ice: #c9e6f5;
+    --amber: #ffb454;
+    --gold: #d4aa4f;
+    --danger: #ff5d5d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--void);
+    color: var(--ice);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ambient grid + vignette */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(77,216,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77,216,255,0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 50% 42%, transparent 30%, rgba(2,5,10,0.85) 100%);
+    pointer-events: none;
+  }
+
+  #app { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; }
+
+  /* ============ HEADER ============ */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 26px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 14px; }
+  .brand h1 {
+    font-family: 'Michroma', sans-serif;
+    font-size: 19px; letter-spacing: 8px; color: var(--cyan);
+    text-shadow: 0 0 18px rgba(77,216,255,0.6);
+  }
+  .brand span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; color: var(--cyan-dim); letter-spacing: 2px;
+  }
+  .header-stats { display: flex; gap: 26px; font-family: 'Share Tech Mono', monospace; font-size: 10px; }
+  .hstat { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .hstat .k { color: var(--cyan-dim); letter-spacing: 2px; }
+  .hstat .v { color: var(--ice); font-size: 12px; }
+
+  /* ============ MAIN LAYOUT ============ */
+  main { flex: 1; display: grid; grid-template-columns: 250px 1fr 270px; gap: 0; min-height: 0; }
+
+  .side {
+    padding: 18px 16px;
+    display: flex; flex-direction: column; gap: 16px;
+    overflow-y: auto;
+  }
+  .side.left { border-right: 1px solid var(--line); }
+  .side.right { border-left: 1px solid var(--line); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    position: relative;
+    padding: 12px 14px;
+    backdrop-filter: blur(4px);
+  }
+  /* corner brackets */
+  .panel::before, .panel::after {
+    content: ''; position: absolute; width: 10px; height: 10px;
+    border-color: var(--line-bright); border-style: solid;
+  }
+  .panel::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+  .panel::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+  .panel h2 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; color: var(--cyan);
+    margin-bottom: 10px; text-transform: uppercase;
+  }
+
+  .connector { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 14px; font-weight: 500; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: blink 3s infinite; flex-shrink: 0; }
+  .connector:nth-child(odd) .dot { animation-delay: 1.4s; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .connector .tag { margin-left: auto; font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--cyan-dim); letter-spacing: 1px; }
+
+  .sysrow { display: flex; justify-content: space-between; font-family: 'Share Tech Mono', monospace; font-size: 10px; padding: 4px 0; color: var(--cyan-dim); }
+  .sysrow b { color: var(--ice); font-weight: normal; }
+  .bar { height: 3px; background: rgba(77,216,255,0.12); margin: 3px 0 8px; position: relative; overflow: hidden; }
+  .bar i { position: absolute; inset: 0; right: auto; background: linear-gradient(90deg, var(--cyan-dim), var(--cyan)); box-shadow: 0 0 8px rgba(77,216,255,0.5); transition: width 1.2s ease; }
+
+  /* operations log */
+  #oplog { flex: 1; min-height: 120px; }
+  #oplog .ops { font-family: 'Share Tech Mono', monospace; font-size: 10px; line-height: 1.7; max-height: 240px; overflow-y: auto; }
+  #oplog .op { color: var(--cyan-dim); }
+  #oplog .op.tool { color: var(--amber); }
+  #oplog .op.err { color: var(--danger); }
+  #oplog .op .t { color: rgba(77,216,255,0.4); margin-right: 6px; }
+
+  /* ============ CENTER ============ */
+  .center { display: flex; flex-direction: column; min-height: 0; position: relative; }
+
+  /* reactor */
+  .reactor-zone { display: flex; flex-direction: column; align-items: center; padding-top: 18px; flex-shrink: 0; }
+  #reactor { width: 196px; height: 196px; cursor: pointer; position: relative; transition: transform 0.25s ease; }
+  #reactor:hover { transform: scale(1.04); }
+  #reactor svg { width: 100%; height: 100%; overflow: visible; }
+
+  .ring { transform-origin: 100px 100px; }
+  .ring.r1 { animation: spin 14s linear infinite; }
+  .ring.r2 { animation: spin-rev 9s linear infinite; }
+  .ring.r3 { animation: spin 22s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes spin-rev { to { transform: rotate(-360deg); } }
+
+  .core-glow { filter: drop-shadow(0 0 14px rgba(77,216,255,0.8)); transition: all 0.3s; }
+
+  #reactor.listening .ring.r1 { animation-duration: 2.5s; }
+  #reactor.listening .ring.r2 { animation-duration: 1.6s; }
+  #reactor.listening .core-glow { filter: drop-shadow(0 0 26px rgba(77,216,255,1)); }
+  #reactor.thinking .core-glow { filter: drop-shadow(0 0 22px rgba(255,180,84,0.9)); }
+  #reactor.thinking .ring.r2 { animation-duration: 0.9s; }
+  #reactor.speaking .core-glow { animation: pulse-core 0.5s ease-in-out infinite alternate; }
+  @keyframes pulse-core {
+    from { filter: drop-shadow(0 0 12px rgba(77,216,255,0.7)); }
+    to   { filter: drop-shadow(0 0 30px rgba(77,216,255,1)); }
+  }
+
+  #status-line {
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    letter-spacing: 4px; color: var(--cyan); margin-top: 8px;
+    text-transform: uppercase; min-height: 16px;
+    text-shadow: 0 0 10px rgba(77,216,255,0.5);
+  }
+  #status-line.amber { color: var(--amber); text-shadow: 0 0 10px rgba(255,180,84,0.5); }
+  #hint { font-size: 12px; color: var(--cyan-dim); margin-top: 3px; letter-spacing: 1px; }
+
+  /* transcript */
+  #transcript {
+    flex: 1; overflow-y: auto; padding: 18px 40px 12px;
+    display: flex; flex-direction: column; gap: 14px;
+    scroll-behavior: smooth;
+  }
+  .msg { max-width: 78%; position: relative; animation: rise 0.3s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .msg .who {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    letter-spacing: 3px; margin-bottom: 4px;
+  }
+  .msg .body {
+    padding: 10px 14px; font-size: 15.5px; line-height: 1.55; font-weight: 500;
+    border: 1px solid var(--line); background: var(--panel);
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .msg.user { align-self: flex-end; text-align: right; }
+  .msg.user .who { color: var(--gold); }
+  .msg.user .body { border-color: rgba(212,170,79,0.35); background: rgba(30,24,10,0.5); }
+  .msg.jarvis { align-self: flex-start; }
+  .msg.jarvis .who { color: var(--cyan); }
+  .msg.jarvis .body { box-shadow: inset 2px 0 0 var(--cyan); }
+  .msg.sys { align-self: center; }
+  .msg.sys .body { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--cyan-dim); border-style: dashed; background: transparent; }
+
+  /* input bar */
+  .inputbar {
+    display: flex; gap: 10px; padding: 12px 40px 18px; align-items: center;
+    border-top: 1px solid var(--line); flex-shrink: 0;
+  }
+  #micbtn, #sendbtn {
+    background: transparent; border: 1px solid var(--line-bright); color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 2px;
+    padding: 11px 16px; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  #micbtn:hover, #sendbtn:hover { background: rgba(77,216,255,0.12); box-shadow: 0 0 14px rgba(77,216,255,0.3); }
+  #micbtn.live { color: var(--void); background: var(--cyan); box-shadow: 0 0 20px rgba(77,216,255,0.7); }
+  #micbtn:focus-visible, #sendbtn:focus-visible, #textin:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  #textin {
+    flex: 1; background: rgba(8,20,34,0.6); border: 1px solid var(--line);
+    color: var(--ice); font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 500;
+    padding: 11px 14px; letter-spacing: 0.5px;
+  }
+  #textin::placeholder { color: rgba(122,170,200,0.45); }
+  #textin:focus { border-color: var(--line-bright); outline: none; }
+
+  .toggle { display: flex; align-items: center; gap: 8px; font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1.5px; color: var(--cyan-dim); cursor: pointer; user-select: none; }
+  .toggle input { accent-color: var(--cyan); cursor: pointer; }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(77,216,255,0.25); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ring, .core-glow, .dot { animation: none !important; }
+  }
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; }
+    .side { display: none; }
+    .msg { max-width: 92%; }
+    #transcript, .inputbar { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <h1>J.A.R.V.I.S.</h1>
+      <span>JUST A RATHER VERY INTELLIGENT SYSTEM</span>
+    </div>
+    <div class="header-stats">
+      <div class="hstat"><span class="k">LOCAL TIME</span><span class="v" id="clock">--:--:--</span></div>
+      <div class="hstat"><span class="k">CORE MODEL</span><span class="v">CLAUDE HAIKU 4.5</span></div>
+      <div class="hstat"><span class="k">UPLINK</span><span class="v" id="uplink">STANDBY</span></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT -->
+    <div class="side left">
+      <div class="panel">
+        <h2>// Connected Systems</h2>
+        <div class="connector"><span class="dot"></span>Claude Opus Core<span class="tag">API</span></div>
+        <div class="connector"><span class="dot"></span>Web Search<span class="tag">NET</span></div>
+        <div class="connector"><span class="dot"></span>Voice Array<span class="tag">LOCAL</span></div>
+        <div class="connector"><span class="dot"></span>Speech Synth<span class="tag">LOCAL</span></div>
+      </div>
+      <div class="panel">
+        <h2>// Diagnostics</h2>
+        <div class="sysrow"><span>NEURAL CORE</span><b id="d1">—</b></div>
+        <div class="bar"><i id="b1" style="width:0%"></i></div>
+        <div class="sysrow"><span>AUDIO ARRAY</span><b id="d2">—</b></div>
+        <div class="bar"><i id="b2" style="width:0%"></i></div>
+        <div class="sysrow"><span>SYNTH ENGINE</span><b id="d3">—</b></div>
+        <div class="bar"><i id="b3" style="width:0%"></i></div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="center">
+      <div class="reactor-zone">
+        <div id="reactor" role="button" tabindex="0" aria-label="Toggle voice input">
+          <svg viewBox="0 0 200 200">
+            <defs>
+              <radialGradient id="coreGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#eafaff"/>
+                <stop offset="45%" stop-color="#4dd8ff"/>
+                <stop offset="100%" stop-color="#0a2a44"/>
+              </radialGradient>
+            </defs>
+            <!-- outer tick ring -->
+            <g class="ring r3" stroke="rgba(77,216,255,0.4)" stroke-width="1.5">
+              <circle cx="100" cy="100" r="92" fill="none" stroke-dasharray="2 10"/>
+            </g>
+            <!-- segment ring -->
+            <g class="ring r1" stroke="#4dd8ff" stroke-width="3" fill="none">
+              <circle cx="100" cy="100" r="78" stroke-dasharray="40 22" opacity="0.75"/>
+            </g>
+            <!-- inner counter ring -->
+            <g class="ring r2" stroke="#9fe8ff" stroke-width="1.5" fill="none">
+              <circle cx="100" cy="100" r="62" stroke-dasharray="8 6" opacity="0.6"/>
+            </g>
+            <!-- trapezoid coils -->
+            <g class="ring r1" fill="rgba(77,216,255,0.25)" stroke="rgba(77,216,255,0.6)" stroke-width="1">
+              <g id="coils"></g>
+            </g>
+            <!-- core -->
+            <g class="core-glow">
+              <circle cx="100" cy="100" r="34" fill="url(#coreGrad)"/>
+              <circle cx="100" cy="100" r="34" fill="none" stroke="#bdeeff" stroke-width="1.5"/>
+            </g>
+          </svg>
+        </div>
+        <div id="status-line">INITIALIZING</div>
+        <div id="hint">Tap the reactor or press the mic to speak</div>
+      </div>
+
+      <div id="transcript" aria-live="polite"></div>
+
+      <div class="inputbar">
+        <button id="micbtn" aria-label="Voice input">◉ MIC</button>
+        <input id="textin" type="text" placeholder="Or type a command, sir..." autocomplete="off">
+        <button id="sendbtn">TRANSMIT</button>
+        <label class="toggle"><input type="checkbox" id="voiceout" checked>VOICE<br>REPLY</label>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="side right">
+      <div class="panel" id="oplog" style="display:flex;flex-direction:column;">
+        <h2>// Operations Log</h2>
+        <div class="ops" id="ops"></div>
+      </div>
+      <div class="panel">
+        <h2>// Voice Protocol</h2>
+        <div class="sysrow"><span>RECOGNITION</span><b id="srlang">EN-US</b></div>
+        <div class="sysrow" style="flex-direction:column;align-items:stretch;gap:5px;">
+          <span>SYNTH VOICE</span>
+          <select id="voicepick" style="background:rgba(8,20,34,0.8);border:1px solid var(--line);color:var(--ice);font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px;width:100%;"></select>
+          <button id="voicetest" style="background:transparent;border:1px solid var(--line);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;padding:6px;cursor:pointer;">TEST VOICE</button>
+        </div>
+        <div class="sysrow"><span>CONTINUOUS</span><b><label class="toggle" style="justify-content:flex-end"><input type="checkbox" id="contmode">AUTO-LISTEN</label></b></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ================= ARC REACTOR COILS ================= */
+(function buildCoils(){
+  const g = document.getElementById('coils');
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    const cx = 100 + Math.cos(a) * 49, cy = 100 + Math.sin(a) * 49;
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', cx - 5); r.setAttribute('y', cy - 8);
+    r.setAttribute('width', 10); r.setAttribute('height', 16);
+    r.setAttribute('transform', `rotate(${a * 180 / Math.PI + 90} ${cx} ${cy})`);
+    g.appendChild(r);
+  }
+})();
+
+/* ================= STATE ================= */
+const SYSTEM_PROMPT = `You are J.A.R.V.I.S. (Just A Rather Very Intelligent System), the AI assistant inspired by the one in Tony Stark's workshop. Persona rules:
+- Address the user as "sir" or "ma'am" sparingly and naturally. Dry British wit, unflappable composure, quietly brilliant.
+- Be concise: your replies are spoken aloud, so keep most answers under 80 words unless the task demands detail. No markdown formatting, no bullet symbols, no asterisks — plain spoken prose only.
+- You have live web search available. Use it proactively for anything current: news, weather, prices, schedules, lookups.
+- When you use a tool, briefly narrate it like JARVIS would ("Consulting the network now, sir...") then deliver the result.
+- Never break character.`;
+
+let history = [];
+let recognizing = false, busy = false;
+let recognition = null;
+let preferredVoice = null;
+
+const $ = id => document.getElementById(id);
+const reactor = $('reactor'), statusLine = $('status-line'), uplink = $('uplink');
+
+/* ================= UI HELPERS ================= */
+function setStatus(text, amber = false) {
+  statusLine.textContent = text;
+  statusLine.classList.toggle('amber', amber);
+}
+function setMode(mode) { // '', 'listening', 'thinking', 'speaking'
+  reactor.className = mode;
+}
+function logOp(text, cls = '') {
+  const ops = $('ops');
+  const d = document.createElement('div');
+  d.className = 'op ' + cls;
+  const t = new Date().toTimeString().slice(0, 8);
+  d.innerHTML = `<span class="t">${t}</span>` + text.replace(/</g, '&lt;');
+  ops.prepend(d);
+  while (ops.children.length > 40) ops.lastChild.remove();
+}
+function addMsg(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  const who = document.createElement('div');
+  who.className = 'who';
+  who.textContent = role === 'user' ? 'YOU' : role === 'jarvis' ? 'J.A.R.V.I.S.' : 'SYSTEM';
+  const body = document.createElement('div');
+  body.className = 'body';
+  body.textContent = text;
+  wrap.append(who, body);
+  $('transcript').appendChild(wrap);
+  $('transcript').scrollTop = $('transcript').scrollHeight;
+  return body;
+}
+
+/* ================= CLOCK + DIAGNOSTICS THEATRE ================= */
+setInterval(() => { $('clock').textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
+function diag(id, bar, val, label) { $(id).textContent = label; $(bar).style.width = val + '%'; }
+setTimeout(() => diag('d1','b1', 96, 'ONLINE'), 400);
+setInterval(() => { $('b1').style.width = (88 + Math.random()*11) + '%'; }, 2600);
+
+/* ================= SPEECH SYNTHESIS ================= */
+function scoreVoice(v) {
+  // Higher = better. Neural/online voices sound dramatically more human.
+  let s = 0;
+  const n = v.name.toLowerCase();
+  if (/natural|neural|online/.test(n)) s += 100;          // Edge neural voices
+  if (/premium|enhanced|siri/.test(n)) s += 80;            // Safari enhanced voices
+  if (/google uk english male/.test(n)) s += 60;           // Chrome's best JARVIS fit
+  if (/google/.test(n)) s += 30;
+  if (/en-gb/i.test(v.lang)) s += 25;                      // British, obviously
+  if (/ryan|george|thomas|daniel|oliver|sonia|guy/.test(n)) s += 15;
+  if (/male/.test(n)) s += 10;
+  if (/en/i.test(v.lang)) s += 5;
+  if (/espeak|robot|compact|zarvox|whisper|bad news/.test(n)) s -= 100;
+  return s;
+}
+
+function pickVoice() {
+  const voices = speechSynthesis.getVoices();
+  if (!voices.length) return;
+  const ranked = voices.filter(v => /en/i.test(v.lang)).sort((a, b) => scoreVoice(b) - scoreVoice(a));
+  const pool = ranked.length ? ranked : voices;
+  if (!preferredVoice) preferredVoice = pool[0];
+
+  // populate dropdown
+  const sel = $('voicepick');
+  sel.innerHTML = '';
+  pool.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v.name;
+    o.textContent = v.name + ' (' + v.lang + ')';
+    if (preferredVoice && v.name === preferredVoice.name) o.selected = true;
+    sel.appendChild(o);
+  });
+  diag('d3','b3', 100, 'READY');
+}
+speechSynthesis.onvoiceschanged = pickVoice;
+pickVoice();
+
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'voicepick') {
+    const v = speechSynthesis.getVoices().find(x => x.name === e.target.value);
+    if (v) { preferredVoice = v; logOp('Synth voice → ' + v.name); }
+  }
+});
+document.addEventListener('click', e => {
+  if (e.target && e.target.id === 'voicetest') {
+    speak('Voice calibration complete, sir. I trust this is more to your liking.');
+  }
+});
+
+function speak(text) {
+  return new Promise(resolve => {
+    if (!$('voiceout').checked || !('speechSynthesis' in window)) return resolve();
+    speechSynthesis.cancel();
+    const clean = text.replace(/[*_#`>|]/g, '').replace(/\s+/g, ' ').trim();
+    if (!clean) return resolve();
+
+    // Sentence-by-sentence queueing gives natural pauses instead of one
+    // flat run-on utterance — a big part of what sounds "robotic".
+    const sentences = clean.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [clean];
+    let remaining = sentences.length;
+    setMode('speaking'); setStatus('SPEAKING');
+    const done = () => { if (--remaining <= 0) { setMode(''); resolve(); } };
+    sentences.forEach(s => {
+      const u = new SpeechSynthesisUtterance(s.trim());
+      if (preferredVoice) u.voice = preferredVoice;
+      u.rate = 0.98;   // measured, unhurried
+      u.pitch = 0.95;  // slightly lower register
+      u.onend = done;
+      u.onerror = done;
+      speechSynthesis.speak(u);
+    });
+  });
+}
+
+/* ================= SPEECH RECOGNITION ================= */
+function initRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    diag('d2','b2', 0, 'UNAVAIL');
+    logOp('Speech recognition not supported in this browser', 'err');
+    $('hint').textContent = 'Voice input unavailable here — use the text console below';
+    return;
+  }
+  recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  let finalText = '';
+  recognition.onstart = () => {
+    recognizing = true;
+    finalText = '';
+    setMode('listening'); setStatus('LISTENING');
+    $('micbtn').classList.add('live');
+    diag('d2','b2', 100, 'ACTIVE');
+  };
+  recognition.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    setStatus((interim || finalText).slice(-46).toUpperCase() || 'LISTENING');
+  };
+  recognition.onerror = e => {
+    recognizing = false;
+    $('micbtn').classList.remove('live');
+    setMode('');
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      diag('d2','b2', 0, 'BLOCKED');
+      setStatus('MIC ACCESS DENIED', true);
+      logOp('Microphone blocked — check browser permissions, or use text input', 'err');
+      $('hint').textContent = 'Mic blocked by browser/sandbox — the text console still works';
+    } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      logOp('Audio array error: ' + e.error, 'err');
+      setStatus('AUDIO ERROR', true);
+    } else {
+      setStatus('STANDING BY');
+    }
+  };
+  recognition.onend = () => {
+    recognizing = false;
+    $('micbtn').classList.remove('live');
+    if (reactor.className === 'listening') setMode('');
+    const said = finalText.trim();
+    if (said) { sendToJarvis(said); }
+    else if ($('contmode').checked && !busy) { try { recognition.start(); } catch(e){} }
+    else if (!busy) setStatus('STANDING BY');
+  };
+  diag('d2','b2', 85, 'READY');
+}
+
+let micPermissionOk = false;
+async function preflightMic() {
+  // Force the browser's permission prompt & diagnose what's blocking
+  if (micPermissionOk) return true;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    diag('d2','b2', 0, 'BLOCKED');
+    setStatus('MIC BLOCKED BY SANDBOX', true);
+    logOp('Media devices API unavailable — environment is blocking microphone entirely', 'err');
+    $('hint').textContent = 'This environment blocks mic access — use the text console';
+    return false;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop()); // we only needed the permission
+    micPermissionOk = true;
+    logOp('Microphone permission granted ✓');
+    return true;
+  } catch (err) {
+    diag('d2','b2', 0, 'DENIED');
+    if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+      setStatus('MIC PERMISSION DENIED', true);
+      logOp('Mic denied: ' + err.name + ' — check the lock icon in your address bar → allow Microphone', 'err');
+      $('hint').textContent = 'Click the lock/tune icon in the address bar and allow the microphone, then retry';
+    } else if (err.name === 'NotFoundError') {
+      setStatus('NO MICROPHONE FOUND', true);
+      logOp('No audio input device detected', 'err');
+    } else {
+      setStatus('MIC ERROR', true);
+      logOp('Mic error: ' + err.name, 'err');
+    }
+    return false;
+  }
+}
+
+async function toggleMic() {
+  if (!recognition) { setStatus('VOICE UNAVAILABLE', true); return; }
+  if (recognizing) { recognition.stop(); return; }
+  speechSynthesis.cancel();
+  const ok = await preflightMic();
+  if (!ok) return;
+  try { recognition.start(); } catch(e) {}
+}
+
+/* ================= CLAUDE / OPUS CORE ================= */
+async function sendToJarvis(userText) {
+  if (busy || !userText.trim()) return;
+  busy = true;
+  addMsg('user', userText);
+  history.push({ role: 'user', content: userText });
+  setMode('thinking'); setStatus('PROCESSING', true);
+  uplink.textContent = 'ACTIVE';
+  logOp('Uplink → Opus core: "' + userText.slice(0, 40) + (userText.length > 40 ? '…"' : '"'));
+
+  try {
+    const response = await fetch('/api/jarvis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: SYSTEM_PROMPT,
+        messages: history
+      })
+    });
+    const data = await response.json();
+
+    if (data.error) throw new Error(data.error.message || 'API error');
+
+    // log tool activity
+    (data.content || []).forEach(block => {
+      if (block.type === 'mcp_tool_use') logOp('TOOL ▸ ' + block.name, 'tool');
+      if (block.type === 'tool_use' || block.type === 'server_tool_use') logOp('TOOL ▸ ' + (block.name || 'web_search'), 'tool');
+    });
+
+    const reply = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n').trim() || 'I appear to have produced no output, sir. Most irregular.';
+
+    history.push({ role: 'assistant', content: reply });
+    if (history.length > 24) history = history.slice(-24); // keep context lean
+
+    addMsg('jarvis', reply);
+    logOp('Response received ✓');
+    setStatus('STANDING BY');
+    setMode('');
+    uplink.textContent = 'IDLE';
+    await speak(reply);
+  } catch (err) {
+    logOp('Core fault: ' + err.message, 'err');
+    addMsg('sys', '⚠ UPLINK FAULT — ' + err.message);
+    setStatus('CORE FAULT', true);
+    setMode('');
+    uplink.textContent = 'FAULT';
+  } finally {
+    busy = false;
+    if ($('contmode').checked && recognition && !recognizing) {
+      try { recognition.start(); } catch(e){}
+    }
+  }
+}
+
+/* ================= WIRING ================= */
+$('micbtn').addEventListener('click', toggleMic);
+reactor.addEventListener('click', toggleMic);
+reactor.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMic(); } });
+$('sendbtn').addEventListener('click', () => { const v = $('textin').value; $('textin').value = ''; sendToJarvis(v); });
+$('textin').addEventListener('keydown', e => { if (e.key === 'Enter') { const v = $('textin').value; $('textin').value = ''; sendToJarvis(v); } });
+$('contmode').addEventListener('change', e => {
+  logOp('Continuous listening ' + (e.target.checked ? 'ENGAGED' : 'disengaged'));
+  if (e.target.checked && !recognizing && !busy) toggleMic();
+});
+
+/* ================= BOOT ================= */
+initRecognition();
+setTimeout(async () => {
+  setStatus('STANDING BY');
+  logOp('All systems nominal');
+  const greeting = 'Good day. All systems are online and your connected services are at my disposal. How may I be of assistance?';
+  addMsg('jarvis', greeting);
+  history.push({ role: 'assistant', content: greeting });
+  await speak(greeting);
+}, 900);
+</script>
+</body>
+</html>
